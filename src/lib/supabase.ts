@@ -1,6 +1,7 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Supabase browser client.
@@ -8,11 +9,18 @@ import { createBrowserClient } from '@supabase/ssr';
  * Reads from NEXT_PUBLIC_* env vars so it can be used client-side.
  * Set these in Netlify env: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
  *
- * `detectSessionInUrl` makes the client read the OAuth `code` query param
- * from the URL after returning from Google/etc and exchange it for a session.
+ * We cache a single client instance per browser tab so:
+ * - All code paths share the same session state
+ * - PKCE code verifiers stored by signInWithOAuth are available to the same
+ *   client when it handles the return URL
+ * - onAuthStateChange subscribers fire consistently across the app
  */
-export function createClient() {
-  return createBrowserClient(
+let client: SupabaseClient | null = null;
+
+export function createClient(): SupabaseClient {
+  if (client) return client;
+
+  client = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -24,6 +32,7 @@ export function createClient() {
       },
     }
   );
+  return client;
 }
 
 /**
